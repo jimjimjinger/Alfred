@@ -1,0 +1,50 @@
+.gitignore
+
+# ===== ROS2 / colcon 산출물 =====
+/build/
+/install/
+/log/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+
+# ===== FMS 런타임 산출물 (DB는 기록 전용 — 절대 규칙 6) =====
+fms_server/fms.db
+fms_server/fms.db-wal
+fms_server/fms.db-shm
+
+# ===== monitor 스택 런타임 DB (적재 산출물 — git 추적 제외) =====
+monitor_db_files/data/
+
+# ===== monitor_server 런타임 DB (DB는 기록 전용 — 절대 규칙 6) =====
+monitor_server/fms.db
+monitor_server/fms.db-wal
+monitor_server/fms.db-shm
+
+# ===== 환경/로그/에디터 =====
+.env
+*.log
+.idea/
+*.swp
+.vscode
+
+# ===== 모델 파일 (대형 바이너리 — LFS 또는 제외) =====
+*.pt
+*.pth
+*.onnx
+
+# ===== FMS 생성 산출물 =====
+fms_server/web/maps/*.png
+fms_server/web/maps/maps.json
+
+# VSCode 로컬 생성물 (공유 설정만 남기고 캐시/머신종속 파일 제외)
+.vscode/browse.vc.db
+.vscode/*.vc.db
+.vscode/colcon.env

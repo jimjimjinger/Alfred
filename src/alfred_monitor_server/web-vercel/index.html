@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Integrated Security Control System</title>
+<style>
+  :root{
+    /* 관제실(command-center) 테마 — 로컬(네이비/블루)과 구분되는 near-black + 틸/시안 */
+    --bg:#070b12;--panel:#0d1521;--panel2:#13202f;--line:#1f3047;
+    --text:#d7e6f5;--muted:#71889f;--blue:#22d3ee;--green:#34d399;
+    --amber:#fbbf24;--red:#fb6a6a;--purple:#a78bfa;--accent:#22d3ee;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+    radial-gradient(1200px 400px at 80% -100px,rgba(34,211,238,.06),transparent),
+    var(--bg);color:var(--text);font-family:system-ui,"Noto Sans KR",sans-serif}
+  /* 상단 액센트 바 — 관제실 시그니처 */
+  body::before{content:"";position:fixed;top:0;left:0;right:0;height:3px;z-index:1200;
+    background:linear-gradient(90deg,var(--accent),#0ea5b7 40%,transparent)}
+  header{display:flex;align-items:center;gap:14px;padding:12px 18px;background:linear-gradient(180deg,#0e1826,#0b121d);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;box-shadow:0 1px 0 rgba(34,211,238,.12)}
+  .brand{display:flex;flex-direction:column;line-height:1.15}
+  h1{font-size:17px;margin:0;white-space:nowrap;letter-spacing:.02em;font-weight:800}
+  h1 b{color:var(--accent)}
+  .sub{font-size:11px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--green);
+    letter-spacing:.1em;border:1px solid rgba(52,211,153,.4);border-radius:999px;padding:3px 9px}
+  .live i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:livepulse 1.6s infinite}
+  @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.25}}
+  #clock{font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace;font-size:13px;color:var(--text)}
+  .tabs{display:flex;gap:6px;overflow-x:auto;margin-left:10px}
+  .tab{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:7px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+  .tab:hover{color:var(--text);border-color:var(--blue)}.tab.on{background:var(--blue);border-color:var(--blue);color:#07111f}
+  .spacer{flex:1}.logout{color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:5px 12px;border-radius:6px;white-space:nowrap}
+  main{padding:18px;max-width:1540px;margin:0 auto}.tabpanel{display:none}.tabpanel.on{display:block}
+  .grid{display:grid;gap:16px}.kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  .layout{grid-template-columns:minmax(0,1fr) minmax(320px,440px);align-items:start}
+  /* 상황판형 레이아웃 — 지도 크게 + 우측 사이드레일 */
+  .sitgrid{grid-template-columns:minmax(0,1.55fr) minmax(340px,460px);align-items:stretch}
+  .siderail{display:flex;flex-direction:column;gap:16px}
+  .siderail section{margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0}
+  .mapcard{margin-bottom:0;display:flex;flex-direction:column}
+  .map3d.big{height:calc(100vh - 360px);min-height:420px}
+  .sit-kpi .kpi .value{font-size:34px}
+  .sit-kpi .kpi{background:linear-gradient(180deg,var(--panel),#0b1320)}
+  @media(max-width:1120px){.sitgrid{grid-template-columns:1fr}}
+  /* 이벤트 타임라인 */
+  .timeline{overflow:auto;flex:1;min-height:120px;max-height:calc(100vh - 560px);padding-right:4px}
+  .tl-item{display:grid;grid-template-columns:46px 14px 1fr;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line)}
+  .tl-time{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);text-align:right}
+  .tl-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);justify-self:center;box-shadow:0 0 0 3px rgba(255,255,255,.03)}
+  .tl-item.red .tl-dot{background:var(--red);box-shadow:0 0 10px var(--red)}
+  .tl-item.amber .tl-dot{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+  .tl-item.blue .tl-dot{background:var(--blue)}
+  .tl-item.gray{opacity:.6}
+  .tl-body{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media(max-width:1120px){.layout,.two,.three{grid-template-columns:1fr}header{align-items:flex-start;flex-wrap:wrap}.spacer{display:none}}
+  section,.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  section{margin-bottom:16px}h2{font-size:13px;color:var(--muted);margin:0 0 12px;text-transform:uppercase;letter-spacing:.04em}
+  .kpi .label{font-size:12px;color:var(--muted)}.kpi .value{font-size:30px;font-weight:800;margin-top:4px;line-height:1.1}
+  .kpi .foot{font-size:12px;color:var(--muted);margin-top:6px}.kpi.warn{border-color:rgba(251,191,36,.5)}.kpi.danger{border-color:rgba(248,113,113,.55)}
+  .row{display:flex;align-items:center;gap:8px;justify-content:space-between}.muted{color:var(--muted)}
+  .badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700;color:#0b1020}
+  .gray{background:#94a3b8}.blue{background:var(--blue)}.green{background:var(--green)}.amber{background:var(--amber)}.red{background:var(--red)}.purple{background:var(--purple)}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px}.onpill{background:rgba(52,211,153,.18);color:#8ff0c6}.offpill{background:rgba(248,113,113,.18);color:#ffaaa9}
+  table{width:100%;border-collapse:collapse;font-size:13px}td,th{border-bottom:1px solid var(--line);padding:7px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:600}
+  .map3d{width:100%;height:calc(100vh - 305px);min-height:300px;border:1px solid var(--line);border-radius:10px;background:#0a1220}
+  .search{display:flex;gap:8px;margin-bottom:10px}.search input,.search select{background:#0e1524;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px}.search input{flex:1}
+  .btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:7px;padding:7px 10px;cursor:pointer}.btn:hover{border-color:var(--blue)}
+  .empty{color:var(--muted);padding:8px 0}.mono{font-family:ui-monospace,monospace}.bar{height:8px;background:#0e1524;border-radius:999px;overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--blue)}
+  /* 긴급 알람 (개요) — 활성 이벤트 발생 시 표시, 조치완료 시 사라짐 */
+  .alarmwrap{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+  #emergencyAlarms:empty{display:none}
+  .alarm-card{display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:12px;
+    background:linear-gradient(90deg,rgba(248,113,113,.20),rgba(248,113,113,.05));
+    border:1px solid rgba(248,113,113,.6);animation:alarmpulse 1.4s infinite}
+  .alarm-card.warn{background:linear-gradient(90deg,rgba(251,191,36,.20),rgba(251,191,36,.05));border-color:rgba(251,191,36,.6)}
+  @keyframes alarmpulse{0%,100%{box-shadow:0 0 0 1px rgba(248,113,113,.18)}50%{box-shadow:0 0 22px rgba(248,113,113,.45)}}
+  .alarm-card .emo{font-size:26px;line-height:1}
+  .alarm-card .info{flex:1;min-width:0}
+  .alarm-card .ttl{font-size:15px;font-weight:700}
+  .alarm-card .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .alarm-card .acts{display:flex;gap:8px;flex-wrap:wrap}
+  .ebtn{display:inline-flex;align-items:center;gap:5px;text-decoration:none;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .ebtn:hover{filter:brightness(1.12)}
+  .ebtn.call{border-color:rgba(248,113,113,.65);color:#ffd9dd;background:rgba(248,113,113,.12)}
+  .ebtn.sec{border-color:rgba(96,165,250,.65);color:#bfe3ff;background:rgba(96,165,250,.12)}
+  .ebtn.done{background:var(--blue);border-color:var(--blue);color:#07111f;font-weight:700}
+  .ebtn.ack{border-color:rgba(251,191,36,.65);color:#ffe6a8;background:rgba(251,191,36,.12)}
+  .alarm-card.acked{animation:none;opacity:.82;filter:saturate(.7)}
+  /* 연결 끊김(데이터 신선도) 배너 — 마지막 정상 수신 후 임계시간 경과 시 전체 폭 경고 */
+  #staleBanner{position:fixed;top:0;left:0;right:0;z-index:1100;display:none;text-align:center;
+    background:#7f1d1d;color:#fff;font-weight:700;font-size:14px;padding:11px 16px;
+    border-bottom:1px solid #ef4444;box-shadow:0 3px 16px rgba(0,0,0,.45)}
+  #staleBanner.show{display:block;animation:alarmpulse 1.4s infinite}
+  /* ── 모바일(폰) 최적화 — 보안팀 원격 접속은 폰이 주 사용처 ── */
+  @media(max-width:640px){
+    main{padding:11px 10px}
+    header{padding:10px 12px;gap:8px;align-items:center}
+    .brand{flex:1;min-width:0}
+    h1{font-size:15px;overflow:hidden;text-overflow:ellipsis}
+    .brand .sub{display:none}                         /* 좁은 폭에서 부제 숨김 */
+    .tabs{order:5;width:100%;margin-left:0;gap:5px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+    .tab{padding:8px 11px;font-size:13px}             /* 터치 타깃 확보 */
+    #clock{display:none}                              /* 좁은 폭에선 시계 생략 */
+    .live{padding:3px 7px}#conn{display:none}
+    .logout{padding:6px 10px}
+    .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .kpi .value,.sit-kpi .kpi .value{font-size:23px}
+    .kpi .label,.kpi .foot{font-size:11px}
+    .map3d,.map3d.big{height:52vh;min-height:260px}
+    .timeline{max-height:46vh}
+    section,.card{padding:12px}
+    section{overflow-x:auto}                           /* 넓은 표는 카드 안에서 가로 스크롤 */
+    table{font-size:12px}td,th{padding:6px 5px}
+    /* 알람 카드: 세로로 쌓고 버튼 풀폭 */
+    .alarm-card{flex-wrap:wrap;gap:10px;padding:12px}
+    .alarm-card .emo{font-size:22px}
+    .alarm-card .info{flex:1 1 100%}
+    .alarm-card .acts{flex:1 1 100%}
+    .alarm-card .acts .ebtn{flex:1;justify-content:center}
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabase-config.js"></script>
+<style>
+  #loginOverlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;
+    background:rgba(8,11,18,.92)}
+  #loginOverlay.hide{display:none}
+  #loginOverlay .card{width:340px;max-width:92vw;background:#182030;border:1px solid #2b3650;border-radius:14px;
+    padding:28px 26px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+  #loginOverlay h1{font-size:18px;margin:0 0 4px}
+  #loginOverlay .sub{color:#8a97b0;font-size:12px;margin-bottom:18px}
+  #loginOverlay label{display:block;font-size:12px;color:#8a97b0;margin:12px 0 6px}
+  #loginOverlay input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2b3650;
+    background:#0e1422;color:#e8edf6;font-size:14px;outline:none}
+  #loginOverlay button{width:100%;margin-top:20px;padding:11px;border:0;border-radius:8px;
+    background:#5b8def;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+  #loginErr{margin-top:12px;color:#e05a5a;font-size:12.5px;display:none}
+  #loginErr.show{display:block}
+</style>
+</head>
+<body>
+<div id="staleBanner"></div>
+<div id="loginOverlay">
+  <form class="card" id="loginForm">
+    <h1>FMS 관제 대시보드</h1>
+    <div class="sub">다중 로봇 릴레이 에스코트 · 로그인</div>
+    <label for="loginEmail">이메일</label>
+    <input id="loginEmail" type="email" autocomplete="username" autofocus required>
+    <label for="loginPw">비밀번호</label>
+    <input id="loginPw" type="password" autocomplete="current-password" required>
+    <div id="loginErr">로그인 실패 · 이메일 또는 비밀번호 확인</div>
+    <button type="submit">로그인</button>
+  </form>
+</div>
+<header>
+  <div class="brand">
+    <h1>◆ SECURITY <b>CONTROL ROOM</b></h1>
+    <span class="sub">remote situational display</span>
+  </div>
+  <nav class="tabs">
+    <button class="tab on" data-tab="overview">상황판</button>
+    <button class="tab" data-tab="ops">운영 통계</button>
+    <button class="tab" data-tab="events">이벤트</button>
+    <button class="tab" data-tab="map">3D 관제</button>
+    <button class="tab" data-tab="system">시스템</button>
+    <button class="tab" data-tab="search">분실물 검색</button>
+  </nav>
+  <span class="spacer"></span>
+  <span class="live"><i></i>LIVE</span>
+  <span id="clock"></span>
+  <span id="conn" class="sub">연결 중...</span>
+  <a class="logout" id="logoutBtn" href="#">로그아웃</a>
+</header>
+<main>
+  <div id="tab-overview" class="tabpanel on">
+    <div id="emergencyAlarms" class="alarmwrap"></div>
+    <div id="summaryKpis" class="grid kpi-grid sit-kpi"></div>
+    <div class="grid sitgrid" style="margin-top:16px">
+      <section class="mapcard">
+        <h2>실시간 3D 관제</h2>
+        <iframe class="map3d big" src="./viz/?norobot"></iframe>
+      </section>
+      <div class="siderail">
+        <section>
+          <h2>실시간 이벤트 타임라인</h2>
+          <div id="overviewTimeline" class="timeline"></div>
+        </section>
+        <section>
+          <h2>로봇 상태</h2>
+          <div id="overviewRobotStatus"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-ops" class="tabpanel">
+    <section>
+      <h2>운영 통계</h2>
+      <div id="opsKpis" class="grid kpi-grid"></div>
+    </section>
+    <div class="grid two">
+      <section>
+        <h2>언어별 이용객</h2>
+        <div id="languageBreakdown"></div>
+      </section>
+      <section>
+        <h2>감지 이벤트 세부</h2>
+        <div id="eventBreakdown"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="tab-events" class="tabpanel">
+    <div class="grid two">
+      <section>
+        <h2>활성 이벤트</h2>
+        <div id="activeEvents"></div>
+      </section>
+      <section>
+        <h2>이벤트 이력</h2>
+        <div id="events"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="tab-map" class="tabpanel">
+    <section>
+      <h2>3D 관제 뷰</h2>
+      <iframe class="map3d" src="./viz/?norobot"></iframe>
+    </section>
+  </div>
+
+  <div id="tab-system" class="tabpanel">
+    <section>
+      <h2>시스템 상태</h2>
+      <div id="system"></div>
+    </section>
+  </div>
+
+  <div id="tab-search" class="tabpanel">
+    <section>
+      <h2>분실물 검색</h2>
+      <div class="search">
+        <input id="q" placeholder="분실물 검색 — 로봇, 위치(층), class, 스냅샷">
+      </div>
+      <div id="searchResult"></div>
+    </section>
+  </div>
+
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const time = v => v ? new Date(v).toLocaleString() : '-';
+let latest = {robots:[], events:[], active:[], stats:{}, sys:{}};
+
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('on'));
+    btn.classList.add('on');
+    $(`tab-${btn.dataset.tab}`).classList.add('on');
+    if(btn.dataset.tab==='search') search();  // 탭 진입 시 분실물 목록 로드
+  });
+});
+
+// ── Supabase data layer (replaces Flask /api/*) ──────────────────────
+const SB = window.SUPABASE_CONFIG || {};
+const sb = window.supabase.createClient(SB.url, SB.anonKey);
+const TIMEOUT_S = SB.statusTimeout || 10;
+async function rpc(name, params){
+  const { data, error } = await sb.rpc(name, params || {});
+  if(error) throw error;
+  return data;
+}
+function unwrap({data, error}){ if(error) throw error; return data; }
+function eventName(e){
+  const type = e.event_type || 'EVENT';
+  return e.event_class ? `${type}/${e.event_class}` : type;
+}
+function badgeForState(s){
+  if(['ERROR','EMERGENCY'].includes(s)) return 'red';
+  if(['PATROL','IDLE'].includes(s)) return 'green';
+  if(['INTERACTING','ESCORTING','RETURNING'].includes(s)) return 'blue';
+  if(['RESERVED','HANDOVER_READY','WAITING_HANDOVER'].includes(s)) return 'amber';
+  return 'gray';
+}
+function kpi(label, value, foot='', mode=''){
+  return `<div class="card kpi ${mode}"><div class="label">${label}</div><div class="value">${value}</div><div class="foot">${foot}</div></div>`;
+}
+function renderSummary(stats, sys){
+  const ev = stats.events || {}, usage = stats.usage || {}, robots = sys.robots || {};
+  const by = ev.by_type || {};
+  $('summaryKpis').innerHTML =
+    kpi('온라인 로봇', `${robots.online||0}/${robots.total||0}`, `timeout ${robots.timeout_s||0}s`) +
+    kpi('활성 이벤트', ev.active || 0, `누적 ${ev.total || 0}`, ev.active ? 'danger' : '') +
+    kpi('이용객 수', usage.passengers || 0, '사용자 UI 집계') +
+    kpi('에스코트 횟수', usage.escorts || 0, '에스코트 사용 집계') +
+    kpi('화재 / 응급 / 거수자', `${by.FIRE||0} / ${by.EMERGENCY_PATIENT||0} / ${by.SUSPICIOUS_PERSON||0}`, '이벤트 누적');
+}
+function renderOps(stats){
+  const ev = stats.events || {}, usage = stats.usage || {};
+  const by = ev.by_type || {}, cls = ev.by_class || {}, lang = usage.languages || {};
+  const suspicious = by.SUSPICIOUS_PERSON || 0;
+  $('opsKpis').innerHTML =
+    kpi('이용객 수', usage.passengers || 0, 'UI 사용 카운트') +
+    kpi('한국어', lang.ko || 0, 'language=ko') +
+    kpi('중국어', lang.zh || 0, 'language=zh') +
+    kpi('일본어', lang.ja || 0, 'language=ja') +
+    kpi('영어', lang.en || 0, 'language=en') +
+    kpi('교통 약자 수', usage.vulnerable || 0, '노약자/시각장애 등') +
+    kpi('에스코트 횟수', usage.escorts || 0, 'escort_used=true') +
+    kpi('화재 수', by.FIRE || 0, 'event_type=FIRE', by.FIRE ? 'danger' : '') +
+    kpi('긴급 환자 수', by.EMERGENCY_PATIENT || 0, 'event_type=EMERGENCY_PATIENT', by.EMERGENCY_PATIENT ? 'danger' : '') +
+    kpi('거수자 수', suspicious, `gun ${cls.gun||0} · knife ${cls.knife||0}`, suspicious ? 'warn' : '');
+
+  const langRows = [['ko','한국어'],['zh','중국어'],['ja','일본어'],['en','영어'],['etc','기타']];
+  const lmax = Math.max(1, ...langRows.map(([k])=>lang[k]||0));
+  $('languageBreakdown').innerHTML = `<table><tr><th>언어</th><th>건수</th><th>비율</th></tr>` +
+    langRows.map(([code,name])=>`<tr><td>${name}</td><td>${lang[code]||0}</td><td><div class="bar"><i style="width:${((lang[code]||0)/lmax*100).toFixed(1)}%"></i></div></td></tr>`).join('') +
+    `</table>`;
+
+  const eventRows = [
+    ['FIRE','화재'],['EMERGENCY_PATIENT','긴급 환자'],['SUSPICIOUS_PERSON','거수자'],['LOST_ITEM','분실물']
+  ];
+  $('eventBreakdown').innerHTML = `<table><tr><th>이벤트</th><th>건수</th><th>class</th></tr>` +
+    eventRows.map(([code,name])=>`<tr><td>${name}</td><td>${by[code]||0}</td><td class="muted">${Object.entries(cls).map(([k,v])=>`${esc(k)} ${v}`).join(' · ') || '-'}</td></tr>`).join('') +
+    `</table>`;
+}
+// 개요 탭 우측: 로봇별 현재 상태(PATROL/ESCORTING 등) 요약.
+function renderOverviewRobotStatus(robots){
+  $('overviewRobotStatus').innerHTML = robots.length ? robots.map(r=>`
+    <div class="row" style="padding:9px 0;border-bottom:1px solid var(--line)">
+      <div><b>${esc(r.robot_id)}</b> <span class="muted">${r.floor?`${r.floor}층`:''}</span></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="muted" style="font-size:12px">${r.battery ?? '-'}%</span>
+        <span class="badge ${badgeForState(r.state)}">${esc(r.state || 'UNKNOWN')}</span>
+        <span class="pill ${r.online?'onpill':'offpill'}">${r.online?'ON':'OFF'}</span>
+      </div>
+    </div>`).join('') : '<div class="empty">수신된 로봇 상태 없음</div>';
+}
+// 상황판: 최근 이벤트를 세로 타임라인으로. (심각도별 점 색 + 한글 라벨)
+const TL_KO = {FIRE:{ko:'화재',emo:'🔥',sev:'red'}, EMERGENCY_PATIENT:{ko:'긴급환자',emo:'🚑',sev:'red'},
+  SUSPICIOUS_PERSON:{ko:'거수자',emo:'🚨',sev:'amber'}, LOST_ITEM:{ko:'분실물',emo:'🧳',sev:'blue'}};
+function renderTimeline(events){
+  const list = (events || []).slice(0, 40);
+  $('overviewTimeline').innerHTML = list.length ? list.map(e=>{
+    const m = TL_KO[e.event_type] || {ko:eventName(e), emo:'•', sev:'gray'};
+    const sev = e.resolved ? 'gray' : m.sev;
+    const hm = e.at ? new Date(e.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '--:--';
+    const loc = `${esc(e.robot_id||'')}${e.floor!=null?` · ${e.floor}F`:''}${e.resolved?' · 완료':''}`;
+    return `<div class="tl-item ${sev}">
+      <div class="tl-time">${hm}</div><div class="tl-dot"></div>
+      <div class="tl-body">${m.emo} <b>${esc(m.ko)}</b> <span class="muted">${loc}</span></div>
+    </div>`;
+  }).join('') : '<div class="empty">수신된 이벤트 없음</div>';
+}
+function renderEvents(id, events, active=false){
+  $(id).innerHTML = events.length ? `<table><tr><th>type/class</th><th>robot</th><th>loc</th><th>snapshot</th><th>time</th><th></th></tr>`+
+    events.map(e=>`<tr>
+      <td><span class="badge ${e.resolved?'gray':'red'}">${esc(eventName(e))}</span><br><span class="muted">${esc(e.confidence ?? '-')}</span></td>
+      <td>${esc(e.robot_id)}</td><td>${esc(e.floor ?? '-') }F / ${esc(e.x ?? '-')}, ${esc(e.y ?? '-')}</td>
+      <td class="muted">${esc(e.snapshot_ref || '-')}</td><td class="muted">${time(e.at)}</td>
+      <td>${active ? `<button class="btn" onclick="resolveEvent(${e.id})">조치완료</button>` : (e.resolved ? '<span class="muted">완료</span>' : '')}</td>
+    </tr>`).join('') + `</table>` : '<div class="empty">없음</div>';
+}
+function renderSystem(sys){
+  const ros = sys.ros || {}, db = sys.db || {}, r = sys.robots || {}, c = sys.counts || {};
+  const topics = [
+    ...(ros.robot_state_topics || []),
+    ...(ros.event_topics || []),
+    ...(ros.detection_topics || []),
+    ...(ros.information_topic ? [ros.information_topic] : []),
+  ].join(', ');
+  $('system').innerHTML = `<table>
+    <tr><th>ROS2</th><td>${esc(ros.mode || 'direct')} · ${esc(topics || '-')}</td></tr>
+    <tr><th>DB</th><td>${db.ok?'정상':'오류'} · ${esc(db.path)}</td></tr>
+    <tr><th>robots</th><td>${r.online||0}/${r.total||0} online · timeout ${r.timeout_s}s</td></tr>
+    <tr><th>rows</th><td>latest ${c.latest_robot_status||0} · status ${c.robot_status_log||0} · events ${c.events||0} · usage ${c.ui_usage_log||0} · counters ${c.monitor_counters||0}</td></tr>
+  </table>`;
+}
+// 이벤트 유형별 긴급 연락/신고 정의 (화재·환자→119+보안팀, 거수자→112+보안팀)
+const EMERG = {
+  FIRE:              {ko:'화재 발생',    emo:'🔥', cls:'',     call:{label:'📞 119 신고', num:'119'}},
+  EMERGENCY_PATIENT: {ko:'긴급환자 발생', emo:'🚑', cls:'',     call:{label:'📞 119 신고', num:'119'}},
+  SUSPICIOUS_PERSON: {ko:'거수자 감지',  emo:'🚨', cls:'warn',  call:{label:'📞 112 신고', num:'112'}},
+};
+// ── 알람 에스컬레이션 (사운드 + 브라우저 푸시 + 확인/ack) ──────────────
+const ackedAlarms = new Set();     // 경비원이 '확인'한 이벤트 id → 사운드 중지(카드는 유지)
+const notifiedAlarms = new Set();  // 이미 브라우저 푸시한 이벤트 id → 중복 알림 방지
+let _audioCtx, _beepTimer;
+function beep(){
+  try{
+    _audioCtx = _audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(_audioCtx.state==='suspended') _audioCtx.resume();
+    const o=_audioCtx.createOscillator(), g=_audioCtx.createGain(), t=_audioCtx.currentTime;
+    o.type='square'; o.frequency.setValueAtTime(880,t); o.frequency.setValueAtTime(660,t+0.18);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.25,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.36);
+    o.connect(g); g.connect(_audioCtx.destination); o.start(t); o.stop(t+0.38);
+  }catch(_){}
+}
+function startAlarmSound(){ if(_beepTimer) return; beep(); _beepTimer=setInterval(beep,1700); }
+function stopAlarmSound(){ if(_beepTimer){ clearInterval(_beepTimer); _beepTimer=null; } }
+function pushNotif(e){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  const m = EMERG[e.event_type] || {ko:eventName(e), emo:'⚠'};
+  const floor = e.floor!=null ? e.floor+'F' : '';
+  try{ new Notification(`${m.emo} ${m.ko}`, {
+    body:`${e.robot_id||''} ${floor} · 좌표 ${e.x ?? '-'}, ${e.y ?? '-'}`,
+    tag:'alarm-'+e.id, renotify:true, requireInteraction:true }); }catch(_){}
+}
+// 활성 이벤트를 개요 상단 알람으로 표시. 조치완료(resolve)되면 active에서 빠져 사라짐.
+function renderEmergencyAlarms(active){
+  const list = (active || []).filter(e=>!e.resolved);
+  const ids = new Set(list.map(e=>e.id));
+  // 더 이상 활성이 아닌 이벤트는 상태에서 정리(메모리 누수 방지)
+  ackedAlarms.forEach(id=>{ if(!ids.has(id)) ackedAlarms.delete(id); });
+  notifiedAlarms.forEach(id=>{ if(!ids.has(id)) notifiedAlarms.delete(id); });
+  // 새 이벤트 → 브라우저 푸시(이벤트당 1회)
+  list.forEach(e=>{ if(!notifiedAlarms.has(e.id)){ notifiedAlarms.add(e.id); pushNotif(e); } });
+  $('emergencyAlarms').innerHTML = list.map(e=>{
+    const m = EMERG[e.event_type] || {ko:eventName(e), emo:'⚠', cls:'', call:null};
+    const floor = e.floor!=null ? e.floor+'F' : '-';
+    const conf = e.confidence!=null ? Math.round(e.confidence*100)+'%' : '-';
+    const acked = ackedAlarms.has(e.id);
+    const callBtn = m.call ? `<a class="ebtn call" href="tel:${m.call.num}">${m.call.label}</a>` : '';
+    return `<div class="alarm-card ${m.cls} ${acked?'acked':''}">
+      <span class="emo">${m.emo}</span>
+      <div class="info">
+        <div class="ttl">${esc(m.ko)} <span class="muted">· ${esc(e.robot_id||'')}${acked?' · 확인됨':''}</span></div>
+        <div class="meta">${floor} · 좌표 ${esc(e.x ?? '-')}, ${esc(e.y ?? '-')} · 신뢰도 ${conf} · ${time(e.at)}</div>
+      </div>
+      <div class="acts">
+        ${callBtn}
+        ${acked?'':`<button class="ebtn ack" onclick="ackAlarm(${e.id})">🔕 확인</button>`}
+        <button class="ebtn sec" onclick="notifySecurity(${e.id})">🛡 보안팀</button>
+        <button class="ebtn done" onclick="resolveEvent(${e.id})">조치완료</button>
+      </div>
+    </div>`;
+  }).join('');
+  // 미확인 알람이 하나라도 있으면 경보음, 모두 확인/처리되면 중지
+  if(list.some(e=>!ackedAlarms.has(e.id))) startAlarmSound(); else stopAlarmSound();
+}
+function ackAlarm(id){ ackedAlarms.add(id); renderEmergencyAlarms(latest.active); }
+function notifySecurity(id){ alert('보안팀에 통보되었습니다. (event #'+id+')'); }
+async function resolveEvent(id){
+  const { error } = await sb.rpc('resolve_event', { event_id: id });
+  if(error){ alert('조치 실패: '+error.message); return; }
+  await load();
+}
+// 분실물(LOST_ITEM) 이벤트만 검색. 빈 검색어면 최근 분실물 전체 표시.
+async function search(){
+  const q = $('q').value.trim().toLowerCase();
+  let items = await sb.from('events').select('*').eq('event_type','LOST_ITEM')
+    .order('at',{ascending:false}).limit(100).then(unwrap);
+  items = items || [];
+  if(q){
+    items = items.filter(e => [e.robot_id, e.event_class, e.snapshot_ref, e.floor, e.x, e.y]
+      .some(v => String(v ?? '').toLowerCase().includes(q)));
+  }
+  $('searchResult').innerHTML = items.length
+    ? `<table><tr><th>class</th><th>robot</th><th>loc</th><th>snapshot</th><th>time</th><th>상태</th></tr>` +
+      items.map(e=>`<tr>
+        <td>${esc(e.event_class || '분실물')}</td>
+        <td>${esc(e.robot_id)}</td>
+        <td>${esc(e.floor ?? '-')}F / ${esc(e.x ?? '-')}, ${esc(e.y ?? '-')}</td>
+        <td class="muted">${esc(e.snapshot_ref || '-')}</td>
+        <td class="muted">${time(e.at)}</td>
+        <td><span class="badge ${e.resolved?'gray':'red'}">${e.resolved?'회수':'미회수'}</span></td>
+      </tr>`).join('') + `</table>`
+    : `<div class="empty">${q?'검색 결과 없음':'분실물 기록 없음'}</div>`;
+}
+let timer;
+$('q').addEventListener('input', ()=>{clearTimeout(timer); timer=setTimeout(search,250);});
+
+// ── 연결 신선도 감시: 마지막 정상 수신 후 STALE_S초 지나면 전체 폭 경고 ──
+const STALE_S = 15;   // 새로고침 5s 기준 → 3회 연속 실패 정도면 '끊김'
+let lastLoadOk = 0;
+function checkFreshness(){
+  const b = $('staleBanner');
+  if(!lastLoadOk) return;  // 최초 정상 수신 전엔 표시 안 함
+  const age = Math.round((Date.now()-lastLoadOk)/1000);
+  if(age >= STALE_S){
+    b.textContent = `⚠ 데이터 끊김 — 마지막 수신 ${age}초 전. 현재 화면은 실시간이 아닙니다.`;
+    b.classList.add('show');
+  } else {
+    b.classList.remove('show');
+  }
+}
+
+async function load(){
+  try{
+    const [robots, events, active, stats, sys] = await Promise.all([
+      rpc('get_robots', { timeout_s: TIMEOUT_S }),
+      sb.from('events').select('*').order('at',{ascending:false}).limit(50).then(unwrap),
+      sb.from('events').select('*').eq('resolved',0).order('at',{ascending:false}).limit(30).then(unwrap),
+      rpc('get_stats'),
+      rpc('get_system', { timeout_s: TIMEOUT_S }),
+    ]);
+    // ROS/DB fields are server-side only; fill them for renderSystem.
+    sys.ros = { mode:'supabase', information_topic:'',
+      robot_state_topics: robots.map(r=>r.namespace ? r.namespace+'/robot_state' : r.robot_id),
+      event_topics: [], detection_topics: [] };
+    sys.db = { ok:true, path:'supabase' };
+    latest = {robots, events, active, stats, sys};
+    renderSummary(stats, sys);
+    renderOps(stats);
+    renderOverviewRobotStatus(robots);
+    renderEmergencyAlarms(active);
+    renderTimeline(events);
+    renderEvents('activeEvents', active, true);
+    renderEvents('events', events);
+    renderSystem(sys);
+    lastLoadOk = Date.now();
+    checkFreshness();  // 정상 수신 → 끊김 배너 즉시 해제
+    $('conn').textContent = '정상 · ' + new Date().toLocaleTimeString();
+  }catch(e){
+    $('conn').textContent = '연결 오류';
+    checkFreshness();  // 실패 시에도 경과시간 즉시 반영
+  }
+}
+
+function tick(){ const c=$('clock'); if(c) c.textContent = new Date().toLocaleTimeString('ko-KR',{hour12:false}); }
+// ── Auth gate + Realtime bootstrap ───────────────────────────────────
+let _started = false;
+async function start(){
+  if(_started) return; _started = true;
+  $('loginOverlay').classList.add('hide');
+  // 브라우저 푸시 권한 요청(거부해도 화면 알람·사운드는 동작)
+  if('Notification' in window && Notification.permission==='default') Notification.requestPermission();
+  // 자동재생 정책: 첫 사용자 클릭 때 오디오 컨텍스트 활성화(세션 복원 진입 대비)
+  document.addEventListener('click', ()=>{ try{ _audioCtx && _audioCtx.resume(); }catch(_){} }, {once:true});
+  tick(); setInterval(tick, 1000);   // 관제실 시계
+  load();
+  setInterval(load, 5000);        // periodic refresh keeps age_s/online fresh
+  setInterval(checkFreshness, 1000);  // 끊김 배너 1초마다 갱신
+  sb.channel('monitor')
+    .on('postgres_changes', {event:'*', schema:'public', table:'latest_robot_status'}, load)
+    .on('postgres_changes', {event:'*', schema:'public', table:'events'}, load)
+    .subscribe();
+}
+$('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = $('loginEmail').value.trim(), password = $('loginPw').value;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ $('loginErr').classList.add('show'); return; }
+  start();
+});
+$('logoutBtn').addEventListener('click', async (e)=>{
+  e.preventDefault(); await sb.auth.signOut(); location.reload();
+});
+sb.auth.getSession().then(({data})=>{
+  if(data.session) start(); else $('loginOverlay').classList.remove('hide');
+});
+</script>
+</body>
+</html>
